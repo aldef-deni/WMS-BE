@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+expected='Deni Afrizal <deniafrizal2904@gmail.com>'
+zero='0000000000000000000000000000000000000000'
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue
+    if [ "$remote_sha" = "$zero" ]; then
+        commits=$(git rev-list "$local_sha")
+    else
+        commits=$(git rev-list "$remote_sha..$local_sha")
+    fi
+    for commit in $commits; do
+        author=$(git show -s --format='%an <%ae>' "$commit")
+        committer=$(git show -s --format='%cn <%ce>' "$commit")
+        if [ "$author" != "$expected" ] || [ "$committer" != "$expected" ]; then
+            echo "Push rejected: $commit must use $expected for author and committer." >&2
+            exit 1
+        fi
+        if git show -s --format=%B "$commit" | grep -Eiq '^[[:space:]]*co-authored-by[[:space:]]*:'; then
+            echo "Push rejected: Co-authored-by is prohibited in $commit." >&2
+            exit 1
+        fi
+    done
+done

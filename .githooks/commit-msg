@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+expected='Deni Afrizal <deniafrizal2904@gmail.com>'
+for kind in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+    ident=$(git var "$kind")
+    case "$ident" in
+        "$expected "*) ;;
+        *) echo "Commit rejected: author and committer must be $expected." >&2; exit 1 ;;
+    esac
+done
+if grep -Eiq '^[[:space:]]*co-authored-by[[:space:]]*:' "$1"; then
+    echo 'Commit rejected: Co-authored-by trailers are prohibited.' >&2
+    exit 1
+fi
