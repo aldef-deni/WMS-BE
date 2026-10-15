@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Audit;
+use App\Services\DemoReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +17,8 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['email' => 'Akun demo dinonaktifkan di production.']);
         }if (! Auth::attempt($data)) {
             throw ValidationException::withMessages(['email' => 'Email atau password tidak sesuai.']);
+        }if (DemoReset::isDemo($data['email'])) {
+            app(DemoReset::class)->onDemoLogin();
         }$r->session()->regenerate();
         Audit::record('auth.login', (string) auth()->id());
 
