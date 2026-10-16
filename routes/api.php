@@ -6,6 +6,7 @@ use App\Http\Controllers\ExportJobController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\MasterController;
 use App\Http\Controllers\OperationsController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShippingLabelController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,15 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
+        Route::get('profile', [ProfileController::class, 'show']);
+        Route::put('profile', [ProfileController::class, 'update']);
+        Route::put('profile/password', [ProfileController::class, 'password'])->middleware('throttle:6,1');
+        Route::post('profile/avatar', [ProfileController::class, 'avatar'])->middleware('throttle:10,1');
+        Route::delete('profile/avatar', [ProfileController::class, 'removeAvatar']);
+        Route::get('profile/activity', [ProfileController::class, 'activity']);
+        Route::get('profile/sessions', [ProfileController::class, 'sessions']);
+        Route::delete('profile/sessions', [ProfileController::class, 'logoutOtherSessions'])->middleware('throttle:6,1');
+        Route::get('avatars/{id}', [ProfileController::class, 'avatarFile'])->whereNumber('id');
         Route::get('dashboard', [OperationsController::class, 'dashboard']);
         Route::get('notifications', [OperationsController::class, 'notifications']);
         Route::get('permissions', [MasterController::class, 'permissions']);
@@ -45,6 +55,6 @@ Route::prefix('v1')->group(function () {
         Route::get('exports/{kind}', [OperationsController::class, 'export']);
         Route::get('report-jobs', [ExportJobController::class, 'index']);
         Route::post('report-jobs', [ExportJobController::class, 'store']);
-        Route::get('report-jobs/{id}/download',[ExportJobController::class, 'download']);
+        Route::get('report-jobs/{id}/download', [ExportJobController::class, 'download']);
     });
 });

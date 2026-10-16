@@ -20,6 +20,7 @@ class AuthController extends Controller
         }if (DemoReset::isDemo($data['email'])) {
             app(DemoReset::class)->onDemoLogin();
         }$r->session()->regenerate();
+        $r->user()->forceFill(['last_login_at' => now()])->saveQuietly();
         Audit::record('auth.login', (string) auth()->id());
 
         return $this->me($r);
@@ -29,7 +30,7 @@ class AuthController extends Controller
     {
         $u = $r->user();
 
-        return ['user' => $u->load('roles', 'clients', 'warehouses'), 'permissions' => $u->permissions(), 'super_admin' => $u->hasRole('Super Admin')];
+        return ['user' => $u->load('roles', 'clients', 'warehouses'), 'permissions' => $u->permissions(), 'super_admin' => $u->hasRole('Super Admin'), 'demo' => DemoReset::isDemo($u->email)];
     }
 
     public function logout(Request $r)

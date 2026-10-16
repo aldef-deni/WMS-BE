@@ -27,7 +27,10 @@ class DemoReset
     private const EXCLUDED = ['migrations', 'demo_baselines', 'sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs', 'password_reset_tokens', 'personal_access_tokens'];
 
     /** Private storage keys whose files belong to these tables. */
-    private const FILE_TABLES = ['attachments' => 'path', 'report_exports' => 'path'];
+    private const FILE_TABLES = ['attachments' => 'path', 'report_exports' => 'path', 'users' => 'avatar_path'];
+
+    /** Account columns of real (non-demo) users that survive a reset. */
+    private const KEEP_USER_COLUMNS = ['name', 'password', 'remember_token', 'phone', 'job_title', 'avatar_path', 'last_login_at'];
 
     public static function isDemo(?string $email): bool
     {
@@ -101,17 +104,23 @@ class DemoReset
         }
         $data = json_decode($state->payload, true, 512, JSON_THROW_ON_ERROR);
         $tables = array_values(array_intersect($this->tables(), array_keys($data)));
-        $baselineFiles = $this->files($data);
-        $currentFiles = $this->files(collect(self::FILE_TABLES)->filter(fn ($c, $t) => Schema::hasTable($t))->map(fn ($c, $t) => DB::table($t)->get([$c])->map(fn ($r) => (array) $r)->all())->all());
-        // Password changes of real (non-demo) accounts survive the reset.
-        $passwords = DB::table('users')->where('email', '!=', self::EMAIL)->get(['id', 'email', 'password', 'remember_token'])->keyBy('id');
+        $currentFiles = $this->files(collect(self::FILE_TABLES)->filter(fn ($c, $t) => Schema::hasColumn($t, $c))->map(fn ($c, $t) => DB::table($t)->get([$c])->map(fn ($r) => (array) $r)->all())->all());
+        // Profile and password changes of real (non-demo) accounts survive the reset.
+        // Every row gets the same keys so the bulk insert stays aligned.
+        $keep = array_values(array_intersect(self::KEEP_USER_COLUMNS, Schema::getColumnListing('users')));
+        $accounts = DB::table('users')->where('email', '!=', self::EMAIL)->get(array_merge(['id', 'email'], $keep))->keyBy('id');
         if (isset($data['users'])) {
-            $data['users'] = array_map(function ($u) use ($passwords) {
-                $current = $passwords[$u['id']] ?? null;
+            $data['users'] = array_map(function ($u) use ($accounts, $keep) {
+                $current = $accounts[$u['id']] ?? null;
+                $matched = $current && $current->email === $u['email'];
+                foreach ($keep as $column) {
+                    $u[$column] = $matched ? $current->{$column} : ($u[$column] ?? null);
+                }
 
-                return $current && $current->email === $u['email'] ? array_merge($u, ['password' => $current->password, 'remember_token' => $current->remember_token]) : $u;
+                return $u;
             }, $data['users']);
         }
+        $baselineFiles = $this->files($data);
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
         try {
             DB::transaction(function () use ($tables, $data, $state) {

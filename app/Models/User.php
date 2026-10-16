@@ -11,13 +11,21 @@ class User extends Authenticatable
 {
     use HasApiTokens,HasFactory,Notifiable;
 
-    protected $fillable = ['name', 'email', 'password'];
+    protected $fillable = ['name', 'email', 'password', 'phone', 'job_title'];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'avatar_path'];
+
+    protected $appends = ['avatar_url'];
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed'];
+        return ['email_verified_at' => 'datetime', 'last_login_at' => 'datetime', 'password' => 'hashed'];
+    }
+
+    /** API-relative avatar URL (served by GET /api/v1/avatars/{id}); the version busts browser cache after a change. */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->avatar_path ? '/avatars/'.$this->id.'?v='.substr(md5($this->avatar_path), 0, 8) : null;
     }
 
     public function roles()
