@@ -40,7 +40,17 @@ class DocumentController extends Controller
                 $q->where($filter, $r->input($filter));
             }
         }if ($r->filled('search')) {
-            $q->where('number', 'like', '%'.substr($r->string('search'), 0, 100).'%');
+            // Number, courier tracking/manifest number, recipient, or SKU/barcode of an item line.
+            $term = '%'.addcslashes(mb_strtolower(mb_substr(trim((string) $r->string('search')), 0, 100)), '\%_').'%';
+            $q->where(function ($w) use ($term) {
+                $w->where('number', 'like', $term);
+                // JSON values compare as binary in MySQL, so lowercase them for case-insensitive matching.
+                foreach (['tracking_number', 'manifest_number', 'recipient'] as $key) {
+                    $w->orWhereRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.{$key}'))) LIKE ?", [$term]);
+                }
+                $w->orWhereHas('shipments', fn ($s) => $s->where('tracking_number', 'like', $term))
+                    ->orWhereHas('lines.product', fn ($p) => $p->where('sku', 'like', $term)->orWhere('barcode', 'like', $term));
+            });
         }$sort = in_array($r->input('sort'), ['number', 'status', 'created_at', 'priority']) ? $r->input('sort') : 'created_at';
 
         return RecordResource::collection($q->orderBy($sort, $r->input('direction') === 'asc' ? 'asc' : 'desc')->paginate(min(100, max(1, (int) $r->input('per_page', 15)))));
@@ -57,7 +67,7 @@ class DocumentController extends Controller
             }
         }
 
-return new RecordResource($d);
+        return new RecordResource($d);
     }
 
     public function store(DocumentRequest $r, WorkflowService $workflow)
@@ -127,9 +137,9 @@ return new RecordResource($d);
             $address = $row[3];
         }fclose($handle);
         if (! $lines) {
-            abort(422,'CSV kosong.');
+            abort(422, 'CSV kosong.');
         }
 
-return new RecordResource(DB::transaction(fn () => $workflow->create(['type' => 'order', 'client_id' => $data['client_id'], 'warehouse_id' => $data['warehouse_id'], 'lines' => $lines, 'meta' => ['recipient' => $recipient, 'address' => $address]]),5));
+        return new RecordResource(DB::transaction(fn () => $workflow->create(['type' => 'order', 'client_id' => $data['client_id'], 'warehouse_id' => $data['warehouse_id'], 'lines' => $lines, 'meta' => ['recipient' => $recipient, 'address' => $address]]), 5));
     }
 }

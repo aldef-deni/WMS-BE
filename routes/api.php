@@ -8,6 +8,7 @@ use App\Http\Controllers\MasterController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShippingLabelController;
+use App\Http\Controllers\TraceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -46,6 +47,7 @@ Route::prefix('v1')->group(function () {
         Route::get('documents/{id}/label', [ShippingLabelController::class, 'label']);
         Route::get('inventory', [OperationsController::class, 'balances']);
         Route::get('ledger', [OperationsController::class, 'ledger']);
+        Route::get('trace', [TraceController::class, 'show']);
         Route::get('audit', [OperationsController::class, 'audit']);
         Route::get('charges', [OperationsController::class, 'charges']);
         Route::get('invoices', [OperationsController::class, 'invoices']);
